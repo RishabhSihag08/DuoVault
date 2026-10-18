@@ -1,0 +1,935 @@
+<!DOCTYPE html>
+<html lang="en" class="dark scroll-smooth overflow-x-hidden">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DuoVault Admin &amp; System Telemetry Console</title>
+  <meta name="robots" content="noindex, nofollow" />
+  <meta name="theme-color" content="#09090b" />
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%2309090b'/%3E%3Cpath d='M20 26V20a12 12 0 0 1 24 0v6h2a4 4 0 0 1 4 4v20a4 4 0 0 1-4 4H18a4 4 0 0 1-4-4V30a4 4 0 0 1 4-4h2zm6 0h12v-6a6 6 0 0 0-12 0v6zm6 10a4 4 0 0 0-2 7.46V48h4v-4.54A4 4 0 0 0 32 36z' fill='%2310b981'/%3E%3C/svg%3E" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'system-ui', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace']
+          },
+          colors: {
+            admin: {
+              950: '#070a0e',
+              900: '#0c131a',
+              850: '#111b24',
+              800: '#162432',
+              700: '#1f3347',
+              emerald: '#00a884',
+              cyan: '#0ea5e9'
+            }
+          }
+        }
+      }
+    };
+  </script>
+  <style>
+    body {
+      background-color: #070a0e;
+      color: #e2e8f0;
+      font-family: 'Inter', system-ui, sans-serif;
+      min-height: 100vh;
+    }
+    .glass-panel {
+      background: rgba(12, 19, 26, 0.78);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.07);
+      box-shadow: 0 16px 36px -8px rgba(0, 0, 0, 0.5);
+    }
+    .glass-card {
+      background: rgba(17, 27, 36, 0.65);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+    .glass-card:hover {
+      border-color: rgba(255, 255, 255, 0.12);
+    }
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #0c131a;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #1f3347;
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #2a455f;
+    }
+    @keyframes pulseGlow {
+      0%, 100% { opacity: 0.8; transform: scale(1); }
+      50% { opacity: 1; transform: scale(1.15); filter: drop-shadow(0 0 6px #00a884); }
+    }
+    .pulse-glow { animation: pulseGlow 2.5s infinite ease-in-out; }
+  </style>
+</head>
+<body class="bg-admin-950 text-slate-100 min-h-screen flex flex-col selection:bg-emerald-500/30 selection:text-white">
+
+  <!-- TOP ADMIN NAVBAR -->
+  <header class="sticky top-0 z-40 bg-admin-900/90 backdrop-blur-xl border-b border-white/10 px-4 sm:px-8 py-3.5 flex items-center justify-between gap-4">
+    <div class="flex items-center gap-3">
+      <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-700 flex items-center justify-center text-white font-extrabold shadow-lg shadow-emerald-500/20">
+        🛡️
+      </div>
+      <div>
+        <div class="flex items-center gap-2">
+          <h1 class="font-bold text-base tracking-tight text-white">DuoVault Control Center</h1>
+          <span class="text-[10px] font-mono uppercase px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-semibold">ADMIN ROUTE</span>
+        </div>
+        <p class="text-xs text-slate-400 font-mono">Restricted Diagnostic &amp; Purge Console (/admin)</p>
+      </div>
+    </div>
+
+    <!-- Active Realtime Health Pill & Back to Chat Button -->
+    <div class="flex items-center gap-3">
+      <div id="adminConnectionPill" class="flex items-center gap-2 bg-black/40 border border-white/10 px-3 py-1.5 rounded-xl text-xs font-mono">
+        <span id="adminStatusDot" class="w-2.5 h-2.5 rounded-full bg-amber-400 pulse-glow"></span>
+        <span id="adminStatusText" class="text-slate-300">Checking Cloud...</span>
+      </div>
+
+      <a href="/" class="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs flex items-center gap-1.5 shadow-lg shadow-emerald-600/20 transition group">
+        <span>💬</span>
+        <span>Open WhatsApp Chat</span>
+        <span class="group-hover:translate-x-0.5 transition-transform">→</span>
+      </a>
+    </div>
+  </header>
+
+  <!-- MAIN ADMIN CONTAINER -->
+  <main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
+
+    <!-- METRICS OVERVIEW BAR -->
+    <section class="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div class="glass-panel rounded-2xl p-4">
+        <div class="flex items-center justify-between text-xs text-slate-400 mb-1">
+          <span>Active Storage Engine</span>
+          <span class="text-emerald-400">⚡</span>
+        </div>
+        <div id="statActiveEngine" class="text-sm sm:text-base font-bold text-white font-mono truncate">Supabase Cloud</div>
+        <div class="text-[11px] text-slate-400 mt-1">PostgreSQL + Realtime WebSockets</div>
+      </div>
+
+      <div class="glass-panel rounded-2xl p-4">
+        <div class="flex items-center justify-between text-xs text-slate-400 mb-1">
+          <span>Total Database Rows</span>
+          <span class="text-cyan-400 font-mono">#</span>
+        </div>
+        <div id="statTotalRows" class="text-2xl font-bold text-white font-mono">0</div>
+        <div class="text-[11px] text-slate-400 mt-1">Live messages synced in channel</div>
+      </div>
+
+      <div class="glass-panel rounded-2xl p-4">
+        <div class="flex items-center justify-between text-xs text-slate-400 mb-1">
+          <span>Database Payload Size</span>
+          <span class="text-amber-400">📦</span>
+        </div>
+        <div id="statPayloadSize" class="text-2xl font-bold text-white font-mono">0 KB</div>
+        <div class="text-[11px] text-slate-400 mt-1">Free tier footprint estimate</div>
+      </div>
+
+      <div class="glass-panel rounded-2xl p-4">
+        <div class="flex items-center justify-between text-xs text-slate-400 mb-1">
+          <span>Burned View-Once</span>
+          <span class="text-rose-400">🔥</span>
+        </div>
+        <div id="statBurnedCount" class="text-2xl font-bold text-rose-400 font-mono">0</div>
+        <div class="text-[11px] text-slate-400 mt-1">Payloads permanently vaporized</div>
+      </div>
+    </section>
+
+    <!-- ADMIN TABS NAVIGATION -->
+    <div class="flex flex-wrap items-center gap-2 border-b border-white/10 pb-2">
+      <button type="button" onclick="switchAdminTab('purge')" id="tabBtn-purge" class="px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 bg-emerald-600 text-white shadow-md shadow-emerald-600/25">
+        <span>🗑️</span>
+        <span>Between-Chats Permanent Scrubbing</span>
+      </button>
+      <button type="button" onclick="switchAdminTab('database')" id="tabBtn-database" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-300 hover:text-white hover:bg-white/5 transition flex items-center gap-2">
+        <span>🗄️</span>
+        <span>Database Snapshot &amp; Realtime</span>
+      </button>
+      <button type="button" onclick="switchAdminTab('keys')" id="tabBtn-keys" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-300 hover:text-white hover:bg-white/5 transition flex items-center gap-2">
+        <span>🔑</span>
+        <span>Security Codes &amp; Endpoint Config</span>
+      </button>
+      <button type="button" onclick="switchAdminTab('media')" id="tabBtn-media" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-300 hover:text-white hover:bg-white/5 transition flex items-center gap-2">
+        <span>🖼️</span>
+        <span>Media Vault Inspector</span>
+      </button>
+    </div>
+
+    <!-- TAB 1: BETWEEN-CHATS PERMANENT PURGE -->
+    <section id="tab-purge" class="space-y-6">
+      <div class="glass-panel rounded-3xl p-6 space-y-6">
+        <div class="flex flex-wrap items-start justify-between gap-4 pb-4 border-b border-white/10">
+          <div>
+            <h2 class="text-xl font-bold text-white flex items-center gap-2">
+              <span>Synchronized In-Between Permanent Scrubbing</span>
+              <span class="text-xs px-2.5 py-0.5 rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/20 font-mono">PERMANENT COMMIT</span>
+            </h2>
+            <p class="text-xs text-slate-400 mt-1 max-w-2xl">
+              Permanently scrub select messages or entire conversation slices from the middle of the chat history. Changes commit to Supabase and instantly remove the records from both Person 1 and Person 2 in real time.
+            </p>
+          </div>
+          <div class="flex flex-wrap items-center gap-2">
+            <button type="button" onclick="selectAllPurge(true)" class="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-200 border border-slate-700 transition">Select All</button>
+            <button type="button" onclick="selectAllPurge(false)" class="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-200 border border-slate-700 transition">Deselect All</button>
+            <button type="button" onclick="executeCheckedPurge()" class="px-4 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold shadow-lg shadow-rose-600/30 transition flex items-center gap-1.5">
+              <span>🔥</span>
+              <span>Permanently Delete Checked (<span id="checkedCount">0</span>)</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- 3 Purge Control Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <!-- Card 1: Start to End Range Purge -->
+          <div class="glass-card rounded-2xl p-4 space-y-3">
+            <div class="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-300">
+              <span class="w-5 h-5 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-[11px]">1</span>
+              <span>Range Delete in-Between</span>
+            </div>
+            <p class="text-[11px] text-slate-400">Delete all messages chronologically between a start and end message.</p>
+            <div class="space-y-2">
+              <div>
+                <label for="adminRangeStart" class="block text-[10px] uppercase font-mono text-slate-400 mb-1">Start Message</label>
+                <select id="adminRangeStart" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-200 font-mono focus:border-emerald-500 focus:outline-none"></select>
+              </div>
+              <div>
+                <label for="adminRangeEnd" class="block text-[10px] uppercase font-mono text-slate-400 mb-1">End Message</label>
+                <select id="adminRangeEnd" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-200 font-mono focus:border-emerald-500 focus:outline-none"></select>
+              </div>
+              <button type="button" onclick="executeRangePurge()" class="w-full py-2.5 rounded-xl bg-slate-800 hover:bg-rose-900/60 hover:border-rose-700 text-slate-200 hover:text-rose-200 border border-slate-700 text-xs font-bold transition flex items-center justify-center gap-1.5">
+                <span>⚡</span>
+                <span>Scrub Everything in Range</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Card 2: Category Purge -->
+          <div class="glass-card rounded-2xl p-4 space-y-3">
+            <div class="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-300">
+              <span class="w-5 h-5 rounded-lg bg-cyan-500/20 text-cyan-400 flex items-center justify-center text-[11px]">2</span>
+              <span>Targeted Category Scrub</span>
+            </div>
+            <p class="text-[11px] text-slate-400">Quickly scrub specific payload categories from the database without wiping conversational text.</p>
+            <div class="grid grid-cols-1 gap-2 pt-1">
+              <button type="button" onclick="purgeCategory('media')" class="p-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-xs font-semibold text-slate-200 flex items-center justify-between transition">
+                <span class="flex items-center gap-2"><span>🖼️</span><span>Purge All Normal Photos/Videos</span></span>
+                <span class="text-[10px] font-mono text-slate-400">Scrub</span>
+              </button>
+              <button type="button" onclick="purgeCategory('view_once')" class="p-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-xs font-semibold text-slate-200 flex items-center justify-between transition">
+                <span class="flex items-center gap-2"><span>1️⃣</span><span>Purge View-Once Artifacts</span></span>
+                <span class="text-[10px] font-mono text-slate-400">Scrub</span>
+              </button>
+              <button type="button" onclick="purgeCategory('text')" class="p-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-xs font-semibold text-slate-200 flex items-center justify-between transition">
+                <span class="flex items-center gap-2"><span>💬</span><span>Purge All Text History</span></span>
+                <span class="text-[10px] font-mono text-slate-400">Scrub</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Card 3: Audit Mode & Tombstones -->
+          <div class="glass-card rounded-2xl p-4 space-y-3">
+            <div class="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-300">
+              <span class="w-5 h-5 rounded-lg bg-amber-500/20 text-amber-400 flex items-center justify-center text-[11px]">3</span>
+              <span>Deletion Audit Strategy</span>
+            </div>
+            <p class="text-[11px] text-slate-400">Configure whether permanently deleted messages leave an audit tombstone marker or vanish with zero trace.</p>
+            <div class="bg-slate-900/80 p-3 rounded-xl border border-slate-800 space-y-2">
+              <label class="flex items-start gap-2.5 text-xs text-slate-200 cursor-pointer">
+                <input type="checkbox" id="adminTombstoneCheck" class="rounded mt-0.5 bg-slate-800 border-slate-600 text-emerald-500 focus:ring-0" />
+                <div>
+                  <span class="font-medium block">Leave Tombstone Marker</span>
+                  <span class="text-[11px] text-slate-400">Displays "🚫 Message scrubbed" instead of silently dropping the bubble.</span>
+                </div>
+              </label>
+            </div>
+            <div class="pt-2">
+              <button type="button" onclick="purgeEntireDatabase()" class="w-full py-2.5 rounded-xl bg-rose-950/60 hover:bg-rose-900 text-rose-300 border border-rose-800/80 text-xs font-bold transition flex items-center justify-center gap-2">
+                <span>⚠️</span>
+                <span>Complete Wipe / Factory Reset</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Live Messages Purge Table -->
+        <div class="space-y-3">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold uppercase tracking-wider text-slate-300">Live Database Message Log</span>
+            <span class="text-xs text-slate-400 font-mono"><span id="adminTableCount">0</span> rows loaded</span>
+          </div>
+
+          <div class="overflow-x-auto rounded-2xl border border-white/10 glass-card">
+            <table class="w-full text-left border-collapse">
+              <thead>
+                <tr class="bg-black/50 text-[10px] font-bold uppercase tracking-wider text-slate-400 border-b border-white/10 font-mono">
+                  <th class="py-3 px-3 w-10">Sel</th>
+                  <th class="py-3 px-3">Message UUID</th>
+                  <th class="py-3 px-3">Sender</th>
+                  <th class="py-3 px-3">Type</th>
+                  <th class="py-3 px-3">Content Snippet</th>
+                  <th class="py-3 px-3">Timestamp</th>
+                  <th class="py-3 px-3 text-right">Action</th>
+                </tr>
+              </thead>
+              <tbody id="adminPurgeTableBody" class="divide-y divide-white/5 text-xs font-mono"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 2: DATABASE SNAPSHOT & REALTIME -->
+    <section id="tab-database" class="hidden space-y-6">
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <div class="lg:col-span-7 glass-panel rounded-3xl p-6 space-y-5">
+          <div class="flex items-center justify-between pb-3 border-b border-white/10">
+            <div>
+              <h2 class="text-lg font-bold text-white">Supabase PostgreSQL Realtime Engine</h2>
+              <p class="text-xs text-slate-400">Persistent sub-50ms synchronized database connection</p>
+            </div>
+            <button type="button" onclick="testSupabaseConnection()" class="px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-200 border border-slate-700 transition flex items-center gap-1.5">
+              <span>🔄</span>
+              <span>Test Connection</span>
+            </button>
+          </div>
+
+          <div class="bg-slate-900/80 p-4 rounded-2xl border border-slate-800 space-y-2.5 font-mono text-xs">
+            <div class="flex items-center justify-between">
+              <span class="text-slate-400">Supabase URL:</span>
+              <span id="adminSupabaseUrl" class="text-slate-200 truncate font-semibold">Checking...</span>
+            </div>
+            <div class="flex items-center justify-between">
+              <span class="text-slate-400">Anon Key:</span>
+              <span id="adminSupabaseKey" class="text-slate-200">Loaded from environment</span>
+            </div>
+            <div class="flex items-center justify-between">
+              <span class="text-slate-400">Realtime Channel:</span>
+              <span class="text-emerald-400">public:messages (INSERT, UPDATE, DELETE)</span>
+            </div>
+          </div>
+
+          <div class="space-y-2">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-bold uppercase tracking-wider text-slate-300">Live `messages` Table Snapshot (JSON)</span>
+              <div class="flex items-center gap-2">
+                <button type="button" onclick="copyDbJson()" class="text-[11px] px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300">📋 Copy JSON</button>
+                <button type="button" onclick="exportDatabaseJson()" class="text-[11px] px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold">⬇ Export Backup</button>
+              </div>
+            </div>
+            <pre id="adminDbJsonInspector" class="bg-black/60 border border-white/10 rounded-2xl p-4 text-[11px] font-mono text-emerald-300 overflow-x-auto max-h-96 overflow-y-auto"></pre>
+          </div>
+        </div>
+
+        <div class="lg:col-span-5 glass-panel rounded-3xl p-6 space-y-4">
+          <div class="pb-3 border-b border-white/10">
+            <h2 class="text-lg font-bold text-white">Diagnostics &amp; Maintenance</h2>
+            <p class="text-xs text-slate-400">Direct cache and local persistence utilities</p>
+          </div>
+
+          <div class="space-y-3">
+            <div class="glass-card rounded-2xl p-4 space-y-2">
+              <div class="text-xs font-bold text-slate-200">Broadcast Channel Sync</div>
+              <p class="text-xs text-slate-400">Broadcasts instant `STATE_UPDATED` signals across all open browser tabs and chat endpoints on this domain.</p>
+              <button type="button" onclick="broadcastSyncSignal()" class="px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-200 border border-slate-700 transition">📡 Send Broadcast Ping</button>
+            </div>
+
+            <div class="glass-card rounded-2xl p-4 space-y-2">
+              <div class="text-xs font-bold text-slate-200">Pull Fresh from Supabase</div>
+              <p class="text-xs text-slate-400">Discards local volatile cache and queries the Supabase `messages` table directly to rebuild the state.</p>
+              <button type="button" onclick="forcePullSupabase()" class="px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-200 border border-slate-700 transition">⬇ Re-fetch From Cloud</button>
+            </div>
+
+            <div class="glass-card rounded-2xl p-4 space-y-2">
+              <div class="text-xs font-bold text-rose-300">Purge Browser Local Storage</div>
+              <p class="text-xs text-slate-400">Clears `duovault_state_v1` from this browser's local storage without touching Supabase cloud tables.</p>
+              <button type="button" onclick="clearLocalStorageOnly()" class="px-3.5 py-1.5 rounded-xl bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 border border-rose-800/60 text-xs font-semibold transition">Clear Local Storage</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 3: SECURITY CODES & ENDPOINT CONFIG -->
+    <section id="tab-keys" class="hidden space-y-6">
+      <div class="max-w-2xl mx-auto glass-panel rounded-3xl p-6 sm:p-8 space-y-6">
+        <div class="pb-4 border-b border-white/10">
+          <h2 class="text-xl font-bold text-white flex items-center gap-2">
+            <span>🔑 Security Passcodes &amp; Endpoint Configuration</span>
+          </h2>
+          <p class="text-xs text-slate-400 mt-1">Configure the designated access passcodes and display handles for Person 1 and Person 2.</p>
+        </div>
+
+        <form onsubmit="saveAdminSecurityCodes(event)" class="space-y-4">
+          <div class="glass-card rounded-2xl p-4 space-y-3">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-bold uppercase text-emerald-400 font-mono">Person 1 (Endpoint #1)</span>
+              <span class="text-[10px] font-mono text-slate-400">Primary Slot</span>
+            </div>
+            <div>
+              <label for="adminP1Name" class="block text-[11px] text-slate-400 mb-1">Display Name</label>
+              <input id="adminP1Name" type="text" required class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-white focus:border-emerald-500 focus:outline-none" />
+            </div>
+            <div>
+              <label for="adminP1Code" class="block text-[11px] text-slate-400 mb-1">Secret Access Code</label>
+              <input id="adminP1Code" type="text" required class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2 text-xs font-mono text-emerald-300 focus:border-emerald-500 focus:outline-none" />
+            </div>
+          </div>
+
+          <div class="glass-card rounded-2xl p-4 space-y-3">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-bold uppercase text-cyan-400 font-mono">Person 2 (Endpoint #2)</span>
+              <span class="text-[10px] font-mono text-slate-400">Partner Slot</span>
+            </div>
+            <div>
+              <label for="adminP2Name" class="block text-[11px] text-slate-400 mb-1">Display Name</label>
+              <input id="adminP2Name" type="text" required class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-white focus:border-emerald-500 focus:outline-none" />
+            </div>
+            <div>
+              <label for="adminP2Code" class="block text-[11px] text-slate-400 mb-1">Secret Access Code</label>
+              <input id="adminP2Code" type="text" required class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2 text-xs font-mono text-cyan-300 focus:border-emerald-500 focus:outline-none" />
+            </div>
+          </div>
+
+          <div class="glass-card rounded-2xl p-4 space-y-3">
+            <div class="text-xs font-bold uppercase text-slate-300">Global Auto-Expire Message Policy</div>
+            <select id="adminAutoExpireSelect" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-white focus:border-emerald-500 focus:outline-none">
+              <option value="off">Off (Retain messages in database)</option>
+              <option value="60">After 1 Minute</option>
+              <option value="3600">After 1 Hour</option>
+              <option value="86400">After 24 Hours</option>
+            </select>
+          </div>
+
+          <div class="glass-card rounded-2xl p-4 space-y-3">
+            <div class="text-xs font-bold uppercase text-slate-300">Shared Channel Pinned Banner</div>
+            <textarea id="adminPinnedInput" rows="2" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-xs text-white focus:border-emerald-500 focus:outline-none"></textarea>
+          </div>
+
+          <div class="flex justify-end gap-3 pt-2">
+            <button type="submit" class="px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-lg shadow-emerald-600/30 transition">
+              Save Security Configuration
+            </button>
+          </div>
+        </form>
+      </div>
+    </section>
+
+    <!-- TAB 4: MEDIA VAULT INSPECTOR -->
+    <section id="tab-media" class="hidden space-y-6">
+      <div class="glass-panel rounded-3xl p-6 space-y-5">
+        <div class="flex items-center justify-between pb-3 border-b border-white/10">
+          <div>
+            <h2 class="text-lg font-bold text-white">Media Vault &amp; Burned Payloads</h2>
+            <p class="text-xs text-slate-400">Audit stored normal media vs automatically burned view-once assets</p>
+          </div>
+          <span class="text-xs font-mono text-slate-400"><span id="adminMediaCount">0</span> media assets</span>
+        </div>
+
+        <div id="adminMediaGallery" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4"></div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- TOAST NOTIFICATION -->
+  <div id="adminToastContainer" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 pointer-events-none max-w-sm"></div>
+
+  <!-- SCRIPT LOGIC -->
+  <script>
+    const STORAGE_KEY = "duovault_state_v1";
+
+    let state = {
+      config: {
+        p1Name: "Person 1",
+        p1Code: "100509",
+        p2Name: "Person 2",
+        p2Code: "251108",
+        pinnedNote: "DuoVault End-to-End Encrypted Private Channel",
+        autoExpireSeconds: "off",
+        supabaseUrl: "",
+        supabaseAnonKey: ""
+      },
+      messages: [],
+      burnedViewOnceCount: 0,
+      selectedPurgeIds: {}
+    };
+
+    let supabaseClient = null;
+    let realtimeChannel = null;
+
+    try {
+      if (typeof BroadcastChannel !== "undefined") {
+        realtimeChannel = new BroadcastChannel("duovault_realtime_sync");
+        realtimeChannel.onmessage = (ev) => {
+          if (ev.data && ev.data.type === "STATE_UPDATED") {
+            loadFromStorage();
+            renderAdminAll();
+          }
+        };
+      }
+    } catch(e) {}
+
+    function showToast(msg, type = "success") {
+      const c = document.getElementById("adminToastContainer");
+      if (!c) return;
+      const t = document.createElement("div");
+      t.className = `p-3 rounded-2xl text-xs font-semibold shadow-2xl transition-all duration-300 pointer-events-auto flex items-center gap-2 ${
+        type === "error" ? "bg-rose-950/90 text-rose-200 border border-rose-800" : "bg-emerald-950/90 text-emerald-200 border border-emerald-800"
+      }`;
+      t.innerHTML = `<span>${type === 'error' ? '⚠️' : '✓'}</span><span>${msg}</span>`;
+      c.appendChild(t);
+      setTimeout(() => { t.style.opacity = '0'; setTimeout(() => t.remove(), 300); }, 3000);
+    }
+
+    function loadFromStorage() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed.config) state.config = { ...state.config, ...parsed.config };
+          if (Array.isArray(parsed.messages)) state.messages = parsed.messages;
+          if (typeof parsed.burnedViewOnceCount === "number") state.burnedViewOnceCount = parsed.burnedViewOnceCount;
+        }
+      } catch(e) {}
+
+      // Server injected config
+      if (window.DUOVAULT_SERVER_CONFIG) {
+        if (window.DUOVAULT_SERVER_CONFIG.supabaseUrl) state.config.supabaseUrl = window.DUOVAULT_SERVER_CONFIG.supabaseUrl;
+        if (window.DUOVAULT_SERVER_CONFIG.supabaseAnonKey) state.config.supabaseAnonKey = window.DUOVAULT_SERVER_CONFIG.supabaseAnonKey;
+        if (window.DUOVAULT_SERVER_CONFIG.code1) state.config.p1Code = window.DUOVAULT_SERVER_CONFIG.code1;
+        if (window.DUOVAULT_SERVER_CONFIG.code2) state.config.p2Code = window.DUOVAULT_SERVER_CONFIG.code2;
+      }
+    }
+
+    function saveState(broadcast = true) {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      } catch(e) {}
+      if (broadcast && realtimeChannel) {
+        try { realtimeChannel.postMessage({ type: "STATE_UPDATED", timestamp: Date.now() }); } catch(e) {}
+      }
+    }
+
+    async function initSupabaseAdmin() {
+      const url = state.config.supabaseUrl;
+      const key = state.config.supabaseAnonKey;
+
+      const urlEl = document.getElementById("adminSupabaseUrl");
+      if (urlEl) urlEl.textContent = url || "Not Configured (Running in Standby)";
+
+      if (!url || !key || !window.supabase) {
+        setConnStatus(false, "Standby (Local)");
+        return;
+      }
+
+      try {
+        supabaseClient = window.supabase.createClient(url, key, {
+          auth: { persistSession: false },
+          realtime: { params: { eventsPerSecond: 10 } }
+        });
+
+        // Test fetch
+        const { data, error } = await supabaseClient.from("messages").select("*").order("created_at", { ascending: true }).limit(500);
+        if (!error && Array.isArray(data)) {
+          setConnStatus(true, "Connected (Realtime Active)");
+          // Map DB rows to state
+          state.messages = data.map(row => ({
+            id: row.id,
+            sender: row.sender_slot,
+            senderName: row.sender_name || (row.sender_slot === "p1" ? state.config.p1Name : state.config.p2Name),
+            text: row.text_content || "",
+            mediaType: row.media_type || "none",
+            mediaData: row.media_url || null,
+            deliveryMode: row.delivery_mode || "normal",
+            viewedOnce: !!row.is_viewed_once,
+            replyTo: row.reply_to_id || null,
+            reactions: row.reactions || {},
+            status: row.status || "read",
+            timestamp: row.created_at ? new Date(row.created_at).getTime() : Date.now(),
+            isTombstone: row.text_content && row.text_content.startsWith("🚫")
+          }));
+          saveState(false);
+          renderAdminAll();
+        } else {
+          setConnStatus(false, error ? error.message : "Query Failed");
+        }
+
+        // Subscribe
+        supabaseClient.channel("admin-realtime")
+          .on("postgres_changes", { event: "*", schema: "public", table: "messages" }, () => {
+            fetchMessagesFromSupabase();
+          })
+          .subscribe();
+      } catch(e) {
+        setConnStatus(false, e.message);
+      }
+    }
+
+    async function fetchMessagesFromSupabase() {
+      if (!supabaseClient) return;
+      try {
+        const { data, error } = await supabaseClient.from("messages").select("*").order("created_at", { ascending: true });
+        if (!error && Array.isArray(data)) {
+          state.messages = data.map(row => ({
+            id: row.id,
+            sender: row.sender_slot,
+            senderName: row.sender_name,
+            text: row.text_content || "",
+            mediaType: row.media_type || "none",
+            mediaData: row.media_url || null,
+            deliveryMode: row.delivery_mode || "normal",
+            viewedOnce: !!row.is_viewed_once,
+            replyTo: row.reply_to_id || null,
+            reactions: row.reactions || {},
+            status: row.status || "read",
+            timestamp: row.created_at ? new Date(row.created_at).getTime() : Date.now(),
+            isTombstone: row.text_content && row.text_content.startsWith("🚫")
+          }));
+          saveState(true);
+          renderAdminAll();
+        }
+      } catch(e) {}
+    }
+
+    function setConnStatus(connected, text) {
+      const dot = document.getElementById("adminStatusDot");
+      const txt = document.getElementById("adminStatusText");
+      const engine = document.getElementById("statActiveEngine");
+
+      if (connected) {
+        if (dot) dot.className = "w-2.5 h-2.5 rounded-full bg-emerald-400";
+        if (txt) txt.textContent = "Supabase Realtime Connected";
+        if (engine) engine.textContent = "Supabase PostgreSQL";
+      } else {
+        if (dot) dot.className = "w-2.5 h-2.5 rounded-full bg-amber-400";
+        if (txt) txt.textContent = text || "Standby Mode";
+        if (engine) engine.textContent = "Local Storage (Standby)";
+      }
+    }
+
+    function switchAdminTab(tabName) {
+      ["purge", "database", "keys", "media"].forEach(t => {
+        const sec = document.getElementById("tab-" + t);
+        const btn = document.getElementById("tabBtn-" + t);
+        if (sec) sec.className = t === tabName ? "space-y-6" : "hidden space-y-6";
+        if (btn) {
+          if (t === tabName) {
+            btn.className = "px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 bg-emerald-600 text-white shadow-md shadow-emerald-600/25";
+          } else {
+            btn.className = "px-4 py-2 rounded-xl text-xs font-semibold text-slate-300 hover:text-white hover:bg-white/5 transition flex items-center gap-2";
+          }
+        }
+      });
+    }
+
+    function renderAdminAll() {
+      // 1. Overview stats
+      const totalRowsEl = document.getElementById("statTotalRows");
+      if (totalRowsEl) totalRowsEl.textContent = state.messages.length;
+
+      const burnedEl = document.getElementById("statBurnedCount");
+      if (burnedEl) burnedEl.textContent = state.burnedViewOnceCount;
+
+      const jsonStr = JSON.stringify(state.messages);
+      const payloadEl = document.getElementById("statPayloadSize");
+      if (payloadEl) payloadEl.textContent = (new Blob([jsonStr]).size / 1024).toFixed(1) + " KB";
+
+      // 2. Range selects
+      const startSelect = document.getElementById("adminRangeStart");
+      const endSelect = document.getElementById("adminRangeEnd");
+      if (startSelect && endSelect) {
+        startSelect.innerHTML = "";
+        endSelect.innerHTML = "";
+        state.messages.forEach((m, idx) => {
+          const preview = (m.text || (m.mediaType !== 'none' ? `[${m.mediaType}]` : '[empty]')).substring(0, 28);
+          const opt1 = new Option(`#${idx + 1} (${m.sender}): ${preview}`, m.id);
+          const opt2 = new Option(`#${idx + 1} (${m.sender}): ${preview}`, m.id);
+          startSelect.add(opt1);
+          endSelect.add(opt2);
+        });
+        if (state.messages.length > 0) {
+          endSelect.selectedIndex = state.messages.length - 1;
+        }
+      }
+
+      // 3. Purge Table
+      const tbody = document.getElementById("adminPurgeTableBody");
+      const countEl = document.getElementById("adminTableCount");
+      if (countEl) countEl.textContent = state.messages.length;
+
+      if (tbody) {
+        if (state.messages.length === 0) {
+          tbody.innerHTML = `<tr><td colspan="7" class="py-8 text-center text-slate-500 font-sans">No messages recorded in the channel.</td></tr>`;
+        } else {
+          tbody.innerHTML = state.messages.map((m, idx) => {
+            const isChecked = !!state.selectedPurgeIds[m.id];
+            const senderClass = m.sender === "p1" ? "text-emerald-400" : "text-cyan-400";
+            const typeBadge = m.deliveryMode === "view_once" 
+              ? `<span class="px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-300 border border-rose-500/30 text-[10px]">1️⃣ View-Once</span>`
+              : m.mediaType !== "none"
+              ? `<span class="px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[10px]">🖼️ ${m.mediaType}</span>`
+              : `<span class="px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 text-[10px]">Text</span>`;
+
+            const textSnippet = m.isTombstone 
+              ? `<span class="text-rose-400 italic">🚫 Scrubbed</span>` 
+              : (m.text ? m.text.substring(0, 45) : (m.mediaType !== 'none' ? `[Attached ${m.mediaType}]` : ''));
+
+            return `
+              <tr class="hover:bg-white/5 transition">
+                <td class="py-2.5 px-3">
+                  <input type="checkbox" onchange="toggleSelectPurge('${m.id}', this.checked)" ${isChecked ? 'checked' : ''} class="rounded bg-slate-800 border-slate-700 text-emerald-500 focus:ring-0" />
+                </td>
+                <td class="py-2.5 px-3 text-slate-400 text-[11px]">${m.id ? m.id.substring(0, 8) + '...' : '#' + (idx + 1)}</td>
+                <td class="py-2.5 px-3 font-bold ${senderClass}">${m.senderName || m.sender}</td>
+                <td class="py-2.5 px-3">${typeBadge}</td>
+                <td class="py-2.5 px-3 text-slate-200 max-w-xs truncate">${textSnippet}</td>
+                <td class="py-2.5 px-3 text-slate-400 text-[11px]">${new Date(m.timestamp).toLocaleTimeString()}</td>
+                <td class="py-2.5 px-3 text-right">
+                  <button type="button" onclick="deleteSingleMsg('${m.id}')" class="px-2 py-1 rounded bg-rose-950/40 hover:bg-rose-900 text-rose-300 text-[11px] transition">Scrub</button>
+                </td>
+              </tr>
+            `;
+          }).join("");
+        }
+      }
+
+      // 4. Update checked count
+      updateCheckedCounter();
+
+      // 5. Database JSON Inspector
+      const jsonInspector = document.getElementById("adminDbJsonInspector");
+      if (jsonInspector) {
+        jsonInspector.textContent = JSON.stringify(state.messages, null, 2);
+      }
+
+      // 6. Config inputs
+      const p1n = document.getElementById("adminP1Name");
+      const p1c = document.getElementById("adminP1Code");
+      const p2n = document.getElementById("adminP2Name");
+      const p2c = document.getElementById("adminP2Code");
+      const autoEx = document.getElementById("adminAutoExpireSelect");
+      const pinIn = document.getElementById("adminPinnedInput");
+
+      if (p1n && !p1n.value) p1n.value = state.config.p1Name;
+      if (p1c && !p1c.value) p1c.value = state.config.p1Code;
+      if (p2n && !p2n.value) p2n.value = state.config.p2Name;
+      if (p2c && !p2c.value) p2c.value = state.config.p2Code;
+      if (autoEx) autoEx.value = state.config.autoExpireSeconds || "off";
+      if (pinIn && !pinIn.value) pinIn.value = state.config.pinnedNote || "";
+
+      // 7. Media Gallery
+      const gallery = document.getElementById("adminMediaGallery");
+      const mediaCount = document.getElementById("adminMediaCount");
+      const mediaItems = state.messages.filter(m => m.mediaType !== "none" && m.mediaData);
+      if (mediaCount) mediaCount.textContent = mediaItems.length;
+
+      if (gallery) {
+        if (mediaItems.length === 0) {
+          gallery.innerHTML = `<div class="col-span-full py-8 text-center text-slate-500 font-sans text-xs">No active media objects stored in database.</div>`;
+        } else {
+          gallery.innerHTML = mediaItems.map(m => `
+            <div class="glass-card rounded-2xl p-2.5 space-y-2">
+              <div class="w-full h-28 bg-slate-900 rounded-xl overflow-hidden flex items-center justify-center">
+                ${m.mediaType === 'video' ? `<div class="text-3xl">🎬</div>` : `<img src="${m.mediaData}" alt="Stored Media" class="w-full h-full object-cover" />`}
+              </div>
+              <div class="flex items-center justify-between text-[11px] font-mono">
+                <span class="text-slate-400">${m.mediaType}</span>
+                <span class="${m.deliveryMode === 'view_once' ? 'text-rose-400' : 'text-emerald-400'} font-bold">${m.deliveryMode}</span>
+              </div>
+              <button type="button" onclick="deleteSingleMsg('${m.id}')" class="w-full py-1 rounded bg-rose-950/40 text-rose-300 text-[10px] hover:bg-rose-900 transition">Scrub Payload</button>
+            </div>
+          `).join("");
+        }
+      }
+    }
+
+    function toggleSelectPurge(id, checked) {
+      if (checked) state.selectedPurgeIds[id] = true;
+      else delete state.selectedPurgeIds[id];
+      updateCheckedCounter();
+    }
+
+    function selectAllPurge(all) {
+      state.selectedPurgeIds = {};
+      if (all) state.messages.forEach(m => state.selectedPurgeIds[m.id] = true);
+      renderAdminAll();
+    }
+
+    function updateCheckedCounter() {
+      const el = document.getElementById("checkedCount");
+      if (el) el.textContent = Object.keys(state.selectedPurgeIds).length;
+    }
+
+    async function deleteSingleMsg(id) {
+      if (!confirm("Permanently delete message " + id + " from database and both chatters?")) return;
+      await commitPurgeIds([id]);
+    }
+
+    async function executeCheckedPurge() {
+      const ids = Object.keys(state.selectedPurgeIds);
+      if (ids.length === 0) { showToast("No messages selected.", "error"); return; }
+      if (!confirm(`Permanently scrub ${ids.length} selected messages from the database?`)) return;
+      await commitPurgeIds(ids);
+      state.selectedPurgeIds = {};
+    }
+
+    async function executeRangePurge() {
+      const sId = document.getElementById("adminRangeStart").value;
+      const eId = document.getElementById("adminRangeEnd").value;
+      if (!sId || !eId) { showToast("Invalid range selection.", "error"); return; }
+
+      const sIdx = state.messages.findIndex(m => m.id === sId);
+      const eIdx = state.messages.findIndex(m => m.id === eId);
+      if (sIdx === -1 || eIdx === -1) return;
+
+      const from = Math.min(sIdx, eIdx);
+      const to = Math.max(sIdx, eIdx);
+      const targetIds = state.messages.slice(from, to + 1).map(m => m.id);
+
+      if (!confirm(`Permanently scrub all ${targetIds.length} messages in range?`)) return;
+      await commitPurgeIds(targetIds);
+    }
+
+    async function purgeCategory(cat) {
+      let targetIds = [];
+      if (cat === "media") targetIds = state.messages.filter(m => m.mediaType !== "none").map(m => m.id);
+      else if (cat === "view_once") targetIds = state.messages.filter(m => m.deliveryMode === "view_once").map(m => m.id);
+      else if (cat === "text") targetIds = state.messages.filter(m => m.mediaType === "none").map(m => m.id);
+
+      if (targetIds.length === 0) { showToast(`No messages found matching category '${cat}'`, "error"); return; }
+      if (!confirm(`Permanently scrub all ${targetIds.length} ${cat} messages?`)) return;
+      await commitPurgeIds(targetIds);
+    }
+
+    async function commitPurgeIds(ids) {
+      const leaveTombstone = document.getElementById("adminTombstoneCheck")?.checked;
+
+      // 1. Local update
+      if (leaveTombstone) {
+        state.messages = state.messages.map(m => {
+          if (ids.includes(m.id)) {
+            return { ...m, text: "🚫 Message permanently scrubbed by admin.", mediaType: "none", mediaData: null, isTombstone: true };
+          }
+          return m;
+        });
+      } else {
+        state.messages = state.messages.filter(m => !ids.includes(m.id));
+      }
+
+      // 2. Supabase commit
+      if (supabaseClient) {
+        try {
+          if (leaveTombstone) {
+            await supabaseClient.from("messages").update({
+              text_content: "🚫 Message permanently scrubbed by admin.",
+              media_type: "none",
+              media_url: null
+            }).in("id", ids);
+          } else {
+            await supabaseClient.from("messages").delete().in("id", ids);
+          }
+        } catch(e) {
+          console.error("Supabase purge error:", e);
+        }
+      }
+
+      saveState(true);
+      renderAdminAll();
+      showToast(`Successfully scrubbed ${ids.length} message(s).`);
+    }
+
+    async function purgeEntireDatabase() {
+      if (!confirm("CRITICAL WARNING: This will permanently wipe all conversation history and media from both Person 1 and Person 2. Continue?")) return;
+      if (prompt("Type 'PURGE' to confirm complete factory reset:") !== "PURGE") return;
+
+      if (supabaseClient) {
+        try {
+          await supabaseClient.from("messages").delete().neq("id", "00000000-0000-0000-0000-000000000000");
+        } catch(e) {}
+      }
+      state.messages = [];
+      state.selectedPurgeIds = {};
+      saveState(true);
+      renderAdminAll();
+      showToast("All database records wiped cleanly.");
+    }
+
+    function saveAdminSecurityCodes(e) {
+      e.preventDefault();
+      state.config.p1Name = document.getElementById("adminP1Name").value.trim() || "Person 1";
+      state.config.p1Code = document.getElementById("adminP1Code").value.trim() || "100509";
+      state.config.p2Name = document.getElementById("adminP2Name").value.trim() || "Person 2";
+      state.config.p2Code = document.getElementById("adminP2Code").value.trim() || "251108";
+      state.config.autoExpireSeconds = document.getElementById("adminAutoExpireSelect").value;
+      state.config.pinnedNote = document.getElementById("adminPinnedInput").value.trim();
+
+      saveState(true);
+      showToast("Security credentials and policies saved!");
+    }
+
+    function testSupabaseConnection() {
+      showToast("Pinging Supabase...");
+      initSupabaseAdmin();
+    }
+
+    function copyDbJson() {
+      navigator.clipboard.writeText(JSON.stringify(state.messages, null, 2)).then(() => {
+        showToast("JSON copied to clipboard!");
+      });
+    }
+
+    function exportDatabaseJson() {
+      const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = `duovault-backup-${new Date().toISOString().slice(0,10)}.json`;
+      a.click();
+      showToast("Backup exported successfully!");
+    }
+
+    function broadcastSyncSignal() {
+      if (realtimeChannel) {
+        realtimeChannel.postMessage({ type: "STATE_UPDATED", timestamp: Date.now() });
+        showToast("Broadcast sync signal sent.");
+      }
+    }
+
+    async function forcePullSupabase() {
+      showToast("Pulling fresh records from cloud...");
+      await fetchMessagesFromSupabase();
+    }
+
+    function clearLocalStorageOnly() {
+      if (!confirm("Clear duovault_state_v1 from this browser's local storage?")) return;
+      localStorage.removeItem(STORAGE_KEY);
+      showToast("Local storage cleared.");
+      setTimeout(() => location.reload(), 500);
+    }
+
+    // Init on page load
+    window.addEventListener("DOMContentLoaded", () => {
+      loadFromStorage();
+      renderAdminAll();
+      initSupabaseAdmin();
+    });
+  </script>
+</body>
+</html>
